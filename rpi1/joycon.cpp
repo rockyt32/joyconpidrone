@@ -38,7 +38,28 @@ void hid_exchange(hid_device *handle, unsigned char *buf, int len)
 #endif
 }
 
-int hid_dual_exchange(hid_device *handle_l, hid_device *handle_r, unsigned char *buf_l, unsigned char *buf_r, int len)
+int hid_exchange_timeout(hid_device *handle, unsigned char *buf, int len, 
+						int millis)
+{
+    if(!handle) return -1; 
+    
+#ifdef DEBUG_PRINT
+    hex_dump(buf, len);
+#endif
+    
+    hid_write(handle, buf, len);
+
+    int res = hid_read_timeout(handle, buf, 0x400, millis);
+#ifdef DEBUG_PRINT
+    if(res > 0)
+        hex_dump(buf, res);
+#endif
+
+	return res;
+}
+
+int hid_dual_exchange(hid_device *handle_l, hid_device *handle_r, 
+					unsigned char *buf_l, unsigned char *buf_r, int len)
 {
     int res = -1;
     
@@ -96,6 +117,33 @@ void joycon_send_command(hid_device *handle, int command, uint8_t *data, int len
         memcpy(data, buf, 0x40);
 }
 
+int joycon_send_command_timeout(hid_device *handle, int command, uint8_t *data, 
+								int len, int millis)
+{
+	int res;
+    unsigned char buf[0x400];
+    memset(buf, 0, 0x400);
+    
+    if(!bluetooth)
+    {
+        buf[0x00] = 0x80;
+        buf[0x01] = 0x92;
+        buf[0x03] = 0x31;
+    }
+    
+    buf[bluetooth ? 0x0 : 0x8] = command;
+    if(data != NULL && len != 0)
+        memcpy(buf + (bluetooth ? 0x1 : 0x9), data, len);
+    
+    res = hid_exchange_timeout(handle, buf, len + (bluetooth ? 0x1 : 0x9), 
+								millis);
+    
+    if(data)
+        memcpy(data, buf, 0x40);
+	
+	return res;
+}
+
 void joycon_send_subcommand(hid_device *handle, int command, int subcommand, uint8_t *data, int len)
 {
     unsigned char buf[0x400];
@@ -112,6 +160,29 @@ void joycon_send_subcommand(hid_device *handle, int command, int subcommand, uin
         
     if(data)
         memcpy(data, buf, 0x40); //TODO
+}
+
+int joycon_send_subcommand_timeout(hid_device *handle, int command, 
+									int subcommand, uint8_t *data, int len, 
+									int millis)
+{
+	int res;
+    unsigned char buf[0x400];
+    memset(buf, 0, 0x400);
+    
+    uint8_t rumble_base[9] = {(++global_count) & 0xF, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40};
+    memcpy(buf, rumble_base, 9);
+    
+    buf[9] = subcommand;
+    if(data && len != 0)
+        memcpy(buf + 10, data, len);
+        
+    res = joycon_send_command_timeout(handle, command, buf, 10 + len, millis);
+        
+    if(data)
+        memcpy(data, buf, 0x40); //TODO
+
+	return res;
 }
 
 void spi_write(hid_device *handle, uint32_t offs, uint8_t *data, uint8_t len)

@@ -154,9 +154,19 @@ int main(){
 	usleep(50000);
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
 
-	for(i = 0; i <= 500; i++){
+	for(i = 0; i <= 1000; i++){
 		memset(buf[0], 0x00, 0x400);
-		joycon_send_subcommand(handle_l, 0x1, 0x0, buf[0], 0);
+		res = joycon_send_subcommand_timeout(handle_l, 0x1, 0x0, buf[0], 0, 1000);
+
+		// joycon timed out, close handle and exit
+		if(res == -1 || res == 0){ 
+			printf("Joycon timed out... \n");
+			joycon_deinit(handle_l, L"Joy-Con (L)");
+			hid_close(handle_l);
+			hid_exit();
+			return -1;
+		}
+
 		hex_dump(buf[0], 0x3D);
 		printf("Next \n");
 		usleep(15000);

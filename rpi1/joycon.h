@@ -12,14 +12,24 @@ void hex_dump(unsigned char *buf, int len);
 
 void hid_exchange(hid_device *handle, unsigned char *buf, int len);
 
+int hid_exchange_timeout(hid_device *handle, unsigned char *buf, int len, 
+						int millis);
+
 int hid_dual_exchange(hid_device *handle_l, hid_device *handle_r, 
 					unsigned char *buf_l, unsigned char *buf_r, int len);
 
 void joycon_send_command(hid_device *handle, int command, uint8_t *data, 
 						int len);
 
+int joycon_send_command_timeout(hid_device *handle, int command, uint8_t *data, 
+								int len, int millis);
+
 void joycon_send_subcommand(hid_device *handle, int command, int subcommand, 
 							uint8_t *data, int len);
+
+int joycon_send_subcommand_timeout(hid_device *handle, int command, 
+									int subcommand, uint8_t *data, int len, 
+									int millis);
 
 void spi_write(hid_device *handle, uint32_t offs, uint8_t *data, uint8_t len);
 
