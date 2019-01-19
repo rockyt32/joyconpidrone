@@ -16,6 +16,9 @@ unsigned short product_ids[] = {JOYCON_L_BT, JOYCON_R_BT, PRO_CONTROLLER, JOYCON
 
 int main(){
     int res;
+	unsigned char *stick_data;
+	unsigned char stick_hoz;
+	unsigned char stick_vert;
     unsigned char buf[2][0x400] = {0};
     hid_device *handle_l = 0, *handle_r = 0;
     const wchar_t *device_name = L"none";
@@ -154,9 +157,11 @@ int main(){
 	usleep(50000);
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
 
-	for(i = 0; i <= 1000; i++){
+	stick_data = buf[0] + 6;
+
+	for(i = 0; i <= 10000; i++){
 		memset(buf[0], 0x00, 0x400);
-		res = joycon_send_subcommand_timeout(handle_l, 0x1, 0x0, buf[0], 0, 1000);
+		res = joycon_send_subcommand_timeout(handle_l, 0x1, 0x0, buf[0], 0, 3000);
 
 		// joycon timed out, close handle and exit
 		if(res == -1 || res == 0){ 
@@ -166,9 +171,20 @@ int main(){
 			hid_exit();
 			return -1;
 		}
+		
 
-		hex_dump(buf[0], 0x3D);
-		printf("Next \n");
+	
+		if((i % 30) == 0){
+			if(buf[0][2] == 0x8e){ // data only valid if it's 8e
+				hex_dump(buf[0], 0x3D);
+				stick_hoz = ((stick_data[1] & 0x0F) << 4) | ((stick_data[0] & 0xF0) >> 4);;
+				stick_vert = stick_data[2];
+				printf("Horizontal stick: %d \n" , (-128 + (int)(unsigned int)stick_hoz));
+				printf("Vertical stick: %d \n" , (-128 + (int)(unsigned int)stick_vert));
+				// hoz: -80 to 80
+				// vert: -60 to 80 offset 13/14
+			}
+		}
 		usleep(15000);
 	}
 	
