@@ -16,15 +16,20 @@ unsigned short product_ids[] = {JOYCON_L_BT, JOYCON_R_BT, PRO_CONTROLLER, JOYCON
 
 int main(){
     int res;
+	int res2;
 	unsigned char *stick_data;
 	unsigned char stick_hoz;
 	unsigned char stick_vert;
+	unsigned char a_button;
+	unsigned char home_button;
+	unsigned char command;
     unsigned char buf[2][0x400] = {0};
     hid_device *handle_l = 0, *handle_r = 0;
     const wchar_t *device_name = L"none";
     struct hid_device_info *devs, *dev_iter;
     bool charging_grip = false;
 	int i;
+	int hoz, vert, hoz_base, vert_base, is_neg;
     
     setbuf(stdout, NULL); // turn off stdout buffering for test reasons
 
@@ -54,17 +59,13 @@ int main(){
             
             device_print(dev_iter);
             
-			/*
+			
             if(!wcscmp(dev_iter->serial_number, L"000000000001"))
             {
-                bluetooth = false;
+                printf("Only bluetooth devices are supported \n");
+				return -1;
             }
-            else if(!bluetooth)
-            {
-                printf("Can't mix USB HID with Bluetooth HID, exiting...\n");
-                return -1;
-            }
-			*/
+            
             
             // on windows this will be -1 for devices with one interface
             if(dev_iter->interface_number == 0 || dev_iter->interface_number == -1)
@@ -86,11 +87,11 @@ int main(){
 
                         handle_r = handle;
                         break;
-                    case PRO_CONTROLLER:
+                    /*case PRO_CONTROLLER:
                         device_name = L"Pro Controller";
 
                         handle_l = handle;
-                        break;
+                        break;*/
                     case JOYCON_L_BT:
                         device_name = L"Joy-Con (L)";
 						printf("Here \n");
@@ -101,6 +102,12 @@ int main(){
 
                         handle_r = handle;
                         break;
+					case PRO_CONTROLLER:
+						printf("Pro controller type not supported at the moment\n");
+						hid_close(handle);
+						hid_exit();
+						return -1;
+						
                 }
                 
                 if(joycon_init(handle, device_name))
@@ -137,10 +144,13 @@ int main(){
         return -1;
     }
     
-    // Only missing one half by this point
-    if(!handle_r && charging_grip)
+    // Need both joycons
+    if(!handle_r)
     {
-        printf("Could not get handles for both Joy-Con in grip! Exiting...\n");
+        printf("Could not get handles for both Joy-Cons! Exiting...\n");
+		joycon_deinit(handle_l, L"Joy-Con (L)");
+		hid_close(handle_l);		
+		hid_exit();
         return -1;
     }
     
@@ -154,38 +164,102 @@ int main(){
 	buf[0][1] = 5;
     buf[0][5] = 5;
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
+	//usleep(10000);
+	//joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
 	usleep(50000);
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
+	//usleep(10000);
+	//joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
 
 	stick_data = buf[0] + 6;
+	hoz_base = 0;
+	vert_base = 0;	
 
 	for(i = 0; i <= 10000; i++){
 		memset(buf[0], 0x00, 0x400);
+		memset(buf[1], 0x00, 0x400);
+		command = 0;
+		
 		res = joycon_send_subcommand_timeout(handle_l, 0x1, 0x0, buf[0], 0, 3000);
+		usleep(10000);
+		res2 = joycon_send_subcommand_timeout(handle_r, 0x1, 0x0, buf[1], 0, 3000);
 
 		// joycon timed out, close handle and exit
-		if(res == -1 || res == 0){ 
+		if(res == -1 || res == 0 || res2 == -1 || res2 == 0){ 
 			printf("Joycon timed out... \n");
 			joycon_deinit(handle_l, L"Joy-Con (L)");
+			joycon_deinit(handle_r, L"Joy-Con (R)");
 			hid_close(handle_l);
+			hid_close(handle_r);
 			hid_exit();
 			return -1;
 		}
-		
 
-	
+		
+		
 		if((i % 30) == 0){
 			if(buf[0][2] == 0x8e){ // data only valid if it's 8e
-				hex_dump(buf[0], 0x3D);
-				stick_hoz = ((stick_data[1] & 0x0F) << 4) | ((stick_data[0] & 0xF0) >> 4);;
+				//hex_dump(buf[0], 0x3D);
+				stick_hoz = ((stick_data[1] & 0x0F) << 4) | ((stick_data[0] & 0xF0) >> 4);
 				stick_vert = stick_data[2];
-				printf("Horizontal stick: %d \n" , (-128 + (int)(unsigned int)stick_hoz));
-				printf("Vertical stick: %d \n" , (-128 + (int)(unsigned int)stick_vert));
+				
+				
+				hoz = (-128 + (int)(unsigned int) stick_hoz) - hoz_base;
+				vert = (-128 + (int)(unsigned int) stick_vert) - vert_base;
+				printf("Horizontal stick: %d \n" , (int) hoz);
+				printf("Vertical stick: %d \n" , (int) vert);
 				// hoz: -80 to 80
 				// vert: -60 to 80 offset 13/14
+
+				if(i == 30){
+					hoz_base = hoz;
+					vert_base = vert;
+				}
+
+				// Fill command to send for hoz stick
+				is_neg = 0;
+				if(hoz < 0){
+					printf("aa \n");
+					hoz = hoz * -1;
+					is_neg = 1;
+				}
+				hoz = hoz / 21;
+				if(hoz > 3){
+					hoz = 3;
+				}
+				command = command | (hoz & 0x03);
+				command = command | (is_neg << 2);
+
+				// Fill command to send for vert stick
+				is_neg = 0;
+				if(vert < 0){
+					vert = vert * -1;
+					is_neg = 1;
+				}
+				vert = vert / 21;
+				if(vert > 3){
+					vert = 3;
+				}
+				command = command | ((vert & 0x03) << 3);
+				command = command | (is_neg << 5);
+				
+			
+			}
+			if(buf[1][2] == 0x8e){
+				printf("Right joycon \n");
+				hex_dump(buf[1], 0x3D);
+				a_button = (buf[1][3] == 0x08)? 1: 0;
+				home_button = (buf[1][4] == 0x10)? 1: 0;
+				printf("A button: %d \n" , a_button);
+				printf("Home button: %d \n" , home_button);
+				command = command | (a_button << 6);
+				command = command | (home_button << 7);
 			}
 		}
-		usleep(15000);
+
+	
+		
+		usleep(10000);
 	}
 	
 
