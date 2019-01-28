@@ -11,12 +11,12 @@
 #include <string.h>
 #include <sys/types.h>
 #include <signal.h>
+#include "utils.h"
 
 
 #define PORT "32064"  // the port users will be connecting to
-
 #define BACKLOG 50     // how many pending connections queue will hold
-
+#define POWER 0.5
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -31,6 +31,7 @@ void *get_in_addr(struct sockaddr *sa)
 int main(void)
 {
 	int sockfd, client_fd;  // listen on sock_fd, new connection on new_fd
+	int serial_fd;
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
@@ -40,7 +41,8 @@ int main(void)
 	char hostname[128];
 	char command;
 	char home_button, a_button, vert_down, hoz_left, vert_value, hoz_value;
-	
+	msp_rc rc_data;	
+
     /* setup server */
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -107,6 +109,23 @@ int main(void)
 	close(sockfd);  
 	/* server setup complete */
 
+	/* set up serial port */
+	/*serial_fd = serial_open("/dev/usb01", 115200); 
+	if(serial_fd == -1){
+		close(client_fd);
+		return 1;
+	} */
+	/* set up rc data */
+	rc_data.roll = 1500;
+	rc_data.pitch = 1500;
+	rc_data.yaw = 1500;
+	rc_data.throttle = 1000;
+	rc_data.aux1 = 1000;
+	rc_data.aux2 = 1000;
+	rc_data.aux3 = 1500;
+	rc_data.aux4 = 1500;
+	
+
 	numbytes = 1;
 	command = 0;
 	while (numbytes > 0) {
@@ -131,32 +150,65 @@ int main(void)
 			vert_value = (command >> 3) & 0x03;
 			hoz_value = command & 0x03;
 
+			rc_data.roll = 1500;
+			rc_data.pitch = 1500;
+			rc_data.yaw = 1500;
+			rc_data.throttle = 1000;
 			if(a_button){
 				// set forward going value
+				rc_data.pitch = 1500 - (500 * POWER);
 			}
 			if(vert_down){
-
+				rc_data.throttle = 1300 - (100 * vert_value * POWER);
 			} 
 			else {
-
+				rc_data.throttle = 1300 + (166 * vert_value * POWER);
 			}
 			if(hoz_left){
-
+				rc_data.yaw = 1500 - (166 * hoz_value * POWER);
 			} 
 			else{
-
+				rc_data.yaw = 1500 + (166 * hoz_value * POWER);
 			}
 
 			// put componenents together and send in msp
+			/*if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
+				close(client_fd);
+				rc_data.roll = 1500;
+				rc_data.pitch = 1500;
+				rc_data.yaw = 1500;
+				rc_data.throttle = 1000;
+				rc_data.aux1 = 1500;
+				rc_data.aux2 = 1500;
+				rc_data.aux3 = 1500;
+				rc_data.aux4 = 1500;
+				msp_set_raw_rc(serial_fd, &rc_data);
+				return 1;
+			}*/
+			printf("Throttle: %d \n", rc_data.throttle);
+			printf("Yaw: %d \n", rc_data.yaw);
+			printf("Pitch: %d \n", rc_data.pitch);
 		}
 		
 	}
 
-
+	printf("Done \n");
 	
 
 	//clean up
 	close(client_fd);
+	rc_data.roll = 1500;
+	rc_data.pitch = 1500;
+	rc_data.yaw = 1500;
+	rc_data.throttle = 1000;
+	rc_data.aux1 = 1500;
+	rc_data.aux2 = 1500;
+	rc_data.aux3 = 1500;
+	rc_data.aux4 = 1500;
+	/*if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
+		return 1;
+	}*/
+	
 
 
 	return 0;
