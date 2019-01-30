@@ -110,12 +110,14 @@ int main(void)
 	/* server setup complete */
 
 	/* set up serial port */
-	/*serial_fd = serial_open("/dev/usb01", 115200); 
+	serial_fd = serial_open("/dev/ttyUSB0", 115200); 
 	if(serial_fd == -1){
 		close(client_fd);
 		return 1;
-	} */
-	/* set up rc data */
+	}
+	sleep(1);
+	printf("Serial connection established \n");
+	/* set up rc data and arm drone */
 	rc_data.roll = 1500;
 	rc_data.pitch = 1500;
 	rc_data.yaw = 1500;
@@ -124,18 +126,33 @@ int main(void)
 	rc_data.aux2 = 1000;
 	rc_data.aux3 = 1500;
 	rc_data.aux4 = 1500;
-	
+	msp_set_raw_rc(serial_fd, &rc_data);
+	usleep(5000);
+	msp_set_raw_rc(serial_fd, &rc_data);
+	sleep(1);
+	printf("Armed \n");
 
 	numbytes = 1;
 	command = 0;
 	while (numbytes > 0) {
 		numbytes = recv(client_fd, &command, 1, 0);
 		if (numbytes == 0) {
+			rc_data.aux3 = 2000;
 			printf("Connection closed\n");
 		}
 		else if (numbytes == -1) {
 			perror("recv");
-			close(sockfd);
+			close(client_fd);
+			rc_data.roll = 1500;
+			rc_data.pitch = 1500;
+			rc_data.yaw = 1500;
+			rc_data.throttle = 1000;
+			rc_data.aux1 = 1500;
+			rc_data.aux2 = 1500;
+			rc_data.aux3 = 2000;
+			rc_data.aux4 = 1500;
+			msp_set_raw_rc(serial_fd, &rc_data);
+			close(serial_fd);
 			return 1;
 		}
 		else {
@@ -153,16 +170,16 @@ int main(void)
 			rc_data.roll = 1500;
 			rc_data.pitch = 1500;
 			rc_data.yaw = 1500;
-			rc_data.throttle = 1000;
+			rc_data.throttle = 1100;
 			if(a_button){
 				// set forward going value
-				rc_data.pitch = 1500 - (500 * POWER);
+				rc_data.pitch = 1500 - (400 * POWER);
 			}
 			if(vert_down){
-				rc_data.throttle = 1300 - (100 * vert_value * POWER);
+				rc_data.throttle = 1000;
 			} 
 			else {
-				rc_data.throttle = 1300 + (166 * vert_value * POWER);
+				rc_data.throttle = 1100 + (200 * vert_value * POWER);
 			}
 			if(hoz_left){
 				rc_data.yaw = 1500 - (166 * hoz_value * POWER);
@@ -172,7 +189,7 @@ int main(void)
 			}
 
 			// put componenents together and send in msp
-			/*if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
+			if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
 				close(client_fd);
 				rc_data.roll = 1500;
 				rc_data.pitch = 1500;
@@ -180,14 +197,15 @@ int main(void)
 				rc_data.throttle = 1000;
 				rc_data.aux1 = 1500;
 				rc_data.aux2 = 1500;
-				rc_data.aux3 = 1500;
+				rc_data.aux3 = 2000;
 				rc_data.aux4 = 1500;
 				msp_set_raw_rc(serial_fd, &rc_data);
+				close(serial_fd);
 				return 1;
-			}*/
-			printf("Throttle: %d \n", rc_data.throttle);
+			}
+			/*printf("Throttle: %d \n", rc_data.throttle);
 			printf("Yaw: %d \n", rc_data.yaw);
-			printf("Pitch: %d \n", rc_data.pitch);
+			printf("Pitch: %d \n", rc_data.pitch); */
 		}
 		
 	}
@@ -195,7 +213,7 @@ int main(void)
 	printf("Done \n");
 	
 
-	//clean up
+	// clean up and disarm drone
 	close(client_fd);
 	rc_data.roll = 1500;
 	rc_data.pitch = 1500;
@@ -203,12 +221,15 @@ int main(void)
 	rc_data.throttle = 1000;
 	rc_data.aux1 = 1500;
 	rc_data.aux2 = 1500;
-	rc_data.aux3 = 1500;
 	rc_data.aux4 = 1500;
-	/*if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
+	if(msp_set_raw_rc(serial_fd, &rc_data) < 0){
+		close(serial_fd);
 		return 1;
-	}*/
-	
+	}
+	usleep(5000);
+	msp_set_raw_rc(serial_fd, &rc_data);
+	usleep(10000);
+	close(serial_fd);
 
 
 	return 0;
