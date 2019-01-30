@@ -21,6 +21,8 @@
 
 #define PORT "32064" // the port to connect to the server
 
+//#define INVERT_CONTRL  // uncomment to invert up/down controls
+
 unsigned short product_ids_size = 4;
 unsigned short product_ids[] = {JOYCON_L_BT, JOYCON_R_BT, PRO_CONTROLLER, JOYCON_CHARGING_GRIP};
 
@@ -266,21 +268,31 @@ int main(int argc, char *argv[]) {
 	buf[0][1] = 5;
     buf[0][5] = 5;
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
-	//usleep(10000);
-	//joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
 	#ifdef WIN32
-	Sleep(50);
+	Sleep(10);
 	#else
-	usleep(50000);
+	usleep(10000);
+	#endif
+	joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
+	#ifdef WIN32
+	Sleep(40);
+	#else
+	usleep(40000);
 	#endif
 	joycon_send_command(handle_l, 0x10, (uint8_t*)buf, 0x9);
-	//usleep(10000);
-	//joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
+	#ifdef WIN32
+	Sleep(10);
+	#else
+	usleep(10000);
+	#endif
+	joycon_send_command(handle_r, 0x10, (uint8_t*)buf, 0x9);
+	
 
 	stick_data = buf[0] + 6;
 	hoz_base = 0;
 	vert_base = 0;	
 
+	// Main loop: Get joycon button data, and use it to make a command sent via wifi
 	i = 0;
 	while(true){
 		memset(buf[0], 0x00, 0x400);
@@ -289,9 +301,9 @@ int main(int argc, char *argv[]) {
 		
 		res = joycon_send_subcommand_timeout(handle_l, 0x1, 0x0, buf[0], 0, 3000);
 		#ifdef WIN32
-		Sleep(8);
+		Sleep(5);
 		#else
-		usleep(8000);
+		usleep(5000);
 		#endif
 		res2 = joycon_send_subcommand_timeout(handle_r, 0x1, 0x0, buf[1], 0, 3000);
 
@@ -319,8 +331,8 @@ int main(int argc, char *argv[]) {
 				
 			hoz = (-128 + (int)(unsigned int) stick_hoz) - hoz_base;
 			vert = (-128 + (int)(unsigned int) stick_vert) - vert_base;
-			printf("Horizontal stick: %d \n" , (int) hoz);
-			printf("Vertical stick: %d \n" , (int) vert);
+			//printf("Horizontal stick: %d \n" , (int) hoz);
+			//printf("Vertical stick: %d \n" , (int) vert);
 			// hoz: -80 to 80
 			// vert: -60 to 80 offset 13/14
 
@@ -348,10 +360,18 @@ int main(int argc, char *argv[]) {
 			command = command | (is_neg << 2);
 
 			// Fill command to send for vert stick
+			#ifdef INVERT_CONTRL
+			is_neg = 1;
+			#else
 			is_neg = 0;
+			#endif
 			if(vert < 0){
 				vert = vert * -1;
+				#ifdef INVERT_CONTRL
+				is_neg = 0;
+				#else
 				is_neg = 1;
+				#endif
 			}
 			vert = vert / 21;
 			if(vert > 3){
@@ -390,12 +410,13 @@ int main(int argc, char *argv[]) {
 		}
 
 		#ifdef WIN32
-		Sleep(8);
+		Sleep(5);
 		#else
-		usleep(8000);
+		usleep(5000);
 		#endif
 	}
 	
+	printf("Done... Cleaning up and exiting...\n");
 
     if(handle_l)
     {
