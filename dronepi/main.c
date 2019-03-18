@@ -17,6 +17,7 @@
 #define PORT "32064"  // the port users will be connecting to
 #define BACKLOG 50     // how many pending connections queue will hold
 #define POWER 0.5
+#define THROTTLE_BASE 1150
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -170,16 +171,16 @@ int main(void)
 			rc_data.roll = 1500;
 			rc_data.pitch = 1500;
 			rc_data.yaw = 1500;
-			rc_data.throttle = 1100;
+			rc_data.throttle = THROTTLE_BASE;
 			if(a_button){
 				// set forward going value
 				rc_data.pitch = 1500 - (400 * POWER);
 			}
 			if(vert_down){
-				rc_data.throttle = 1000;
+				rc_data.throttle = THROTTLE_BASE - (50 * vert_value * POWER);
 			} 
 			else {
-				rc_data.throttle = 1100 + (200 * vert_value * POWER);
+				rc_data.throttle = THROTTLE_BASE + (200 * vert_value * POWER);
 			}
 			if(hoz_left){
 				rc_data.yaw = 1500 - (166 * hoz_value * POWER);
