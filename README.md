@@ -61,6 +61,9 @@ Controls:
 - Right joycon A button to go forward
 - Right joycon home button to disarm and exit
 
+Video:
+- Coming soon!
+
 Potential future updates:
 - Add raspberry pi camera support so that a headset can be used
 - More sophisticated controls: current setup does not support rolling, and commands are only 1 byte each. Expand to maybe five bytes (1 byte for throttle, 1 byte for yaw, 1 byte for pitch, 1 byte for roll, last byte for home button, aux, and error checking)
